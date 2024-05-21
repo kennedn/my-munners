@@ -6,8 +6,8 @@ SEARCH=$*
 
 [ "${COMMAND}" == "post" ] && [ -z "${SEARCH}" ] && echo "Must provide a search for post" && exit 1
 
-[ -z "${MUNNER_USER}" ] && read -rp "Username: " MUNNER_USER
-[ -z "${MUNNER_PASS}" ] && read -rsp "Password: " MUNNER_PASS
+[ -z "${MUNNER_TOKEN}" ] && [ -z "${MUNNER_USER}" ] && read -rp "Username: " MUNNER_USER 2>&1
+[ -z "${MUNNER_TOKEN}" ] && [ -z "${MUNNER_PASS}" ] && read -rsp "Password: " MUNNER_PASS 2>&1
 
 BASE_URL='https://gsdqxsedgygflroywsnl.supabase.co'
 
@@ -18,12 +18,12 @@ JSON=$(jq -cn \
          --arg password "$MUNNER_PASS" \
          '{"email":$username,"password":$password,"data":{},"gotrue_meta_security":{}}')
 
-[ -z "${ACCESS_TOKEN}" ] && ACCESS_TOKEN=$(curl -s "${BASE_URL}/auth/v1/token?grant_type=password" -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${API_KEY}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' --data-binary "${JSON}" | jq -r '.access_token // ""')
+[ -z "${MUNNER_TOKEN}" ] && MUNNER_TOKEN=$(curl -s "${BASE_URL}/auth/v1/token?grant_type=password" -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${API_KEY}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' --data-binary "${JSON}" | jq -r '.access_token // ""') && printf "export MUNNER_TOKEN=%s\n" "${MUNNER_TOKEN}" 1>&2
 
-PROFILE_ID=$(jq -rR 'split(".") | .[1] | @base64d | fromjson | .sub' <<<"${ACCESS_TOKEN}")
+PROFILE_ID=$(jq -rR 'split(".") | .[1] | @base64d | fromjson | .sub' <<<"${MUNNER_TOKEN}")
 
 if [ "${COMMAND}" == "get" ]; then
-    MUNRO_IDS=$(curl -s "${BASE_URL}/rest/v1/bagged_munros?select=munro_id" -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot')
+    MUNRO_IDS=$(curl -s "${BASE_URL}/rest/v1/bagged_munros?select=munro_id" -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot')
     jq -r --argjson ids "${MUNRO_IDS}" '.[] | select(.id as $id | $ids | any(.munro_id == $id)) | .name' munners.json
 elif [ "${COMMAND}" == "post" ] || [ "${COMMAND}" == "delete" ]; then
     SEARCH_RESULT_JSONS=$(jq -r --arg search "${SEARCH}" '($search | split(" ") | map(ascii_downcase)) as $words | [.[] | reduce $words[] as $word (.; select((. != null) and (.name | ascii_downcase | contains($word)))) | select(. != null)]' munners.json)
@@ -41,10 +41,10 @@ elif [ "${COMMAND}" == "post" ] || [ "${COMMAND}" == "delete" ]; then
                     --arg profile_id "$PROFILE_ID" \
                     --arg munro_id "$MUNRO_ID" \
                     '[{"profile_id":$profile_id,"munro_id":$munro_id}]')
-        curl "${BASE_URL}/rest/v1/bagged_munros?columns=%22profile_id%22%2C%22munro_id%22" -X POST -H 'content-type: application/json' -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' --data-binary "${POST_JSON}"
+        curl "${BASE_URL}/rest/v1/bagged_munros?columns=%22profile_id%22%2C%22munro_id%22" -X POST -H 'content-type: application/json' -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' --data-binary "${POST_JSON}"
     else
-        curl "${BASE_URL}/rest/v1/bagged_munros?munro_id=eq.${MUNRO_ID}" -X DELETE -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' 
+        curl "${BASE_URL}/rest/v1/bagged_munros?munro_id=eq.${MUNRO_ID}" -X DELETE -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot' 
     fi
 fi
 
-#curl "${BASE_URL}/auth/v1/logout" -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot'
+#curl "${BASE_URL}/auth/v1/logout" -X POST -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot'
