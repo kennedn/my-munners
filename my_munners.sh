@@ -26,9 +26,9 @@ if [ "${COMMAND}" == "get" ]; then
     MUNRO_IDS=$(curl -s "${BASE_URL}/rest/v1/bagged_munros?select=munro_id" -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot')
     jq -r --argjson ids "${MUNRO_IDS}" '.[] | select(.id as $id | $ids | any(.munro_id == $id)) | .name' munners.json
 elif [ "${COMMAND}" == "post" ] || [ "${COMMAND}" == "delete" ]; then
-    SEARCH_RESULT_JSONS=$(jq -r --arg search "${SEARCH}" '($search | split(" ") | map(ascii_downcase)) as $words | [.[] | reduce $words[] as $word (.; select((. != null) and (.name | ascii_downcase | contains($word)))) | select(. != null)]' munners.json)
+    SEARCH_RESULT_JSONS=$(jq -r --arg search "${SEARCH}" '($search | split(" ") | map(ascii_downcase)) as $words | [.[] | reduce $words[] as $word (.; select((. != null) and (.searchable_name | contains($word)))) | select(. != null)]' munners.json)
     [ "$(jq length <<<"${SEARCH_RESULT_JSONS}")" -gt 1 ] && echo "More than one munro found:" && jq -r '.[].name' <<<"${SEARCH_RESULT_JSONS}" && exit 1
-    MUNRO_ID=$(jq -r '.[0].id' <<<"${SEARCH_RESULT_JSONS}")
+    MUNRO_ID=$(jq -r '.[0].id | select (. != null)' <<<"${SEARCH_RESULT_JSONS}")
     [ -z "${MUNRO_ID}" ] && echo "No matches" && exit 0
     jq -r '.[0].name' <<<"${SEARCH_RESULT_JSONS}"
     ANSWER=
