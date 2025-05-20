@@ -23,7 +23,7 @@ JSON=$(jq -cn \
 PROFILE_ID=$(jq -rR 'split(".") | .[1] | @base64d | fromjson | .sub' <<<"${MUNNER_TOKEN}")
 
 if [ "${COMMAND}" == "get" ]; then
-    MUNRO_IDS=$(curl -s "${BASE_URL}/rest/v1/bagged_munros?select=munro_id" -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot')
+    MUNRO_IDS=$(curl -s "${BASE_URL}/rest/v1/bagged_munros?select=munro_id&profile_id=eq.${PROFILE_ID}" -H "Authorization: Bearer ${MUNNER_TOKEN}" -H "apikey: ${API_KEY}" -H 'Origin: https://munrobagger.scot')
     jq -r --argjson ids "${MUNRO_IDS}" '.[] | select(.id as $id | $ids | any(.munro_id == $id)) | .name' munners.json
 elif [ "${COMMAND}" == "post" ] || [ "${COMMAND}" == "delete" ]; then
     SEARCH_RESULT_JSONS=$(jq -r --arg search "${SEARCH}" '($search | split(" ") | map(ascii_downcase)) as $words | [.[] | reduce $words[] as $word (.; select((. != null) and (.searchable_name | contains($word)))) | select(. != null)]' munners.json)
